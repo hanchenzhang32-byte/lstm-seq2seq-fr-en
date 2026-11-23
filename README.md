@@ -59,3 +59,7 @@ python evaluate.py   # → test BLEU, examples, failure cases, outputs/test_*.js
 ## Data
 
 Tatoeba French–English pairs from [ManyThings.org](https://www.manythings.org/anki/) (release 2026-02-13), CC-BY 2.0 (France). Attribution: www.manythings.org/anki and tatoeba.org.
+
+## License
+
+Code: [MIT](LICENSE) © 2026 Hanchen Zhang. The Tatoeba data keeps its own CC-BY 2.0 licence (see Data above) and is not included in this repository.
