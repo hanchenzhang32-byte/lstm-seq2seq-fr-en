@@ -1,11 +1,11 @@
-"""第 5 课：推理与评估
+"""Inference and evaluation.
 
-- translate(sentence)：法语原句 → 英语译文（贪心解码，自己的预测作为下一步输入，≤15 个 token）
-- 完整测试集 corpus BLEU（sacreBLEU，tokenize="none"，不使用 Teacher Forcing）
-- 固定种子抽 10 条测试样例
-- 按规则筛出失败案例候选（重复、未知词、漏译、长句）
+- translate(sentence): raw French sentence → English (greedy decoding, own predictions fed back, ≤15 tokens)
+- Corpus BLEU on the full test split (sacreBLEU, tokenize="none", no teacher forcing)
+- 10 test examples drawn with a fixed seed
+- Rule-based failure-case candidates (repetition, unknown words, omission, long sentences)
 
-运行：.venv/bin/python evaluate.py
+Run: python evaluate.py
 """
 
 import json
@@ -42,7 +42,7 @@ def load_model(path=CKPT_PATH):
 
 
 def strip_specials(tokens):
-    """截到第一个 <EOS> 为止，去掉 <SOS>/<EOS>/<PAD>；保留 <UNK>。"""
+    """Cut at the first <EOS>, drop <SOS>/<EOS>/<PAD>; keep <UNK>."""
     out = []
     for tok in tokens:
         if tok == EOS:
@@ -65,7 +65,7 @@ _cache = {}
 
 
 def translate(sentence: str) -> str:
-    """输入一条法语原句，输出英文译文。预处理与训练完全一致。"""
+    """Translate one raw French sentence, using exactly the training preprocessing."""
     if not _cache:
         _cache["model"], _cache["fr"], _cache["en"], _ = load_model()
     fr_tokens = tokenize(sentence)
@@ -88,7 +88,7 @@ def main():
         pred = translate_tokens(model, fr, fr_vocab, en_vocab)
         rows.append({
             "fr": " ".join(fr),
-            "ref": " ".join(en),                     # 参考译文：原始预处理结果，不替换 <UNK>
+            "ref": " ".join(en),                     # reference: original tokens, OOV words not replaced by <UNK>
             "pred": " ".join(pred),
             "fr_unk": [t for t in fr if t not in fr_vocab.stoi],
             "fr_len": len(fr),
@@ -96,40 +96,42 @@ def main():
             "pred_len": len(pred),
         })
 
-    bleu = BLEU(tokenize="none", force=True)   # force：文本本就按作业要求分好词，关掉“未去分词”提示，不影响分数
+    # force=True only silences sacreBLEU's "looks tokenized" warning; scoring tokenized text is intended
+    bleu = BLEU(tokenize="none", force=True)
     score = bleu.corpus_score([r["pred"] for r in rows], [[r["ref"] for r in rows]])
     signature = str(bleu.get_signature())
     sent_bleu = BLEU(tokenize="none", effective_order=True)
     for r in rows:
         r["sent_bleu"] = sent_bleu.sentence_score(r["pred"], [r["ref"]]).score
 
-    print(f"最佳 checkpoint：epoch {ckpt['epoch']}，验证 loss {ckpt['val_loss']:.4f}")
-    print(f"测试集 corpus BLEU = {score.score:.2f}")
+    print(f"Best checkpoint: epoch {ckpt['epoch']}, validation loss {ckpt['val_loss']:.4f}")
+    print(f"Test corpus BLEU = {score.score:.2f}")
     print(f"  {score}")
-    print(f"  sacreBLEU {sacrebleu.__version__}，signature: {signature}")
+    print(f"  sacreBLEU {sacrebleu.__version__}, signature: {signature}")
     exact = sum(r["pred"] == r["ref"] for r in rows)
-    print(f"  与参考完全一致 {exact}/{len(rows)}；输出含 <UNK> {sum('<UNK>' in r['pred'] for r in rows)} 条")
+    n_unk_out = sum("<UNK>" in r["pred"] for r in rows)
+    print(f"  exact matches {exact}/{len(rows)}; outputs containing <UNK>: {n_unk_out}")
 
-    print("\n===== 10 条测试样例（random.Random(42).sample）=====")
+    print("\n===== 10 test examples (random.Random(42).sample) =====")
     sample_idx = sorted(random.Random(42).sample(range(len(rows)), 10))
     for k, i in enumerate(sample_idx, 1):
         r = rows[i]
         print(f"[{k}] #{i}\n  FR : {r['fr']}\n  REF: {r['ref']}\n  OUT: {r['pred']}")
 
-    print("\n===== 失败案例候选 =====")
+    print("\n===== Failure-case candidates =====")
     categories = {
-        "重复生成": [r for r in rows if has_repetition(r["pred"].split())],
-        "源句含未登录词": [r for r in rows if r["fr_unk"] and r["sent_bleu"] < 20],
-        "漏译（输出比参考短 ≥3 个 token）": [r for r in rows if r["ref_len"] - r["pred_len"] >= 3],
-        "长句（法语 10 个 token）且 BLEU < 10": [r for r in rows if r["fr_len"] == 10 and r["sent_bleu"] < 10],
+        "Repetition": [r for r in rows if has_repetition(r["pred"].split())],
+        "Unknown source words": [r for r in rows if r["fr_unk"] and r["sent_bleu"] < 20],
+        "Omission (output ≥3 tokens shorter than reference)": [r for r in rows if r["ref_len"] - r["pred_len"] >= 3],
+        "Long sentence (10 French tokens) with BLEU < 10": [r for r in rows if r["fr_len"] == 10 and r["sent_bleu"] < 10],
     }
     for name, cands in categories.items():
-        print(f"\n--- {name}：共 {len(cands)} 条，前 6 条 ---")
+        print(f"\n--- {name}: {len(cands)} total, first 6 ---")
         for r in cands[:6]:
-            unk = f"  未登录词={r['fr_unk']}" if r["fr_unk"] else ""
+            unk = f"  OOV={r['fr_unk']}" if r["fr_unk"] else ""
             print(f"  FR : {r['fr']}{unk}\n  REF: {r['ref']}\n  OUT: {r['pred']}\n")
 
-    print("===== translate() 演示 =====")
+    print("===== translate() demo =====")
     for s in ["Je suis fatigué.", "Il fait très froid aujourd’hui !", "Où est la gare ?"]:
         print(f"  {s!r} → {translate(s)!r}")
 

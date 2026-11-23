@@ -4,3 +4,6 @@ __pycache__/
 
 # 原始数据不入库，按 README 下载
 data/
+
+# personal learning scratch files
+basics/

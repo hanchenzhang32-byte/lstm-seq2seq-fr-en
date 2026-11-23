@@ -1,64 +1,66 @@
-# 实验报告：基于 PyTorch 与 LSTM 的法→英短句机器翻译
+# Report: French→English Short-Sentence Translation with an LSTM Encoder–Decoder
 
-## 1. 数据
+*中文版：[docs/report_zh.md](docs/report_zh.md)*
 
-**来源**：Tatoeba 法语—英语平行语料，由 ManyThings.org 整理（https://www.manythings.org/anki/ ，下载 `fra-eng.zip`，文件日期 2026-02-13）。许可 CC-BY 2.0 (France)，署名 www.manythings.org/anki 与 tatoeba.org。`data/fra.txt` 原样保留，第三列逐句署名信息未删改，仅不参与训练。
+## 1. Data
 
-**预处理**（作业原文规则列表缺第 1 条，本项目自行规定并统一用于训练、推理和 BLEU 参考文本）：
+**Source.** Tatoeba French–English parallel corpus as packaged by ManyThings.org (https://www.manythings.org/anki/, `fra-eng.zip`, release dated 2026-02-13). Licence CC-BY 2.0 (France); attribution: www.manythings.org/anki and tatoeba.org. The third column (per-sentence attribution) is kept in the raw file and not used for training.
 
-1. Unicode NFC 规范化；不换行空格 `\xa0`、窄不换行空格 ` `、细空格 ` ` 统一为普通空格，零宽空格与软连字符删除；弯引号 `’ ‘` 转为 `'`
-2. 全部小写
-3. 分词正则 `\w+|[^\w\s]`：连续字母/数字为一个 token，每个标点单独为一个 token（如 `don't` → `don ' t`）
+**Preprocessing**, applied identically to training, inference and the BLEU references:
 
-**筛选与划分**：
+1. Unicode NFC; no-break space `\xa0`, narrow no-break space ` ` and thin space ` ` become a plain space; zero-width space and soft hyphen are removed; curly quotes `’ ‘` become `'`
+2. Lowercase
+3. Tokenise with `\w+|[^\w\s]`: a run of letters/digits is one token, every punctuation mark is its own token (`don't` → `don ' t`)
 
-| 步骤 | 数量 |
+**Filtering and split:**
+
+| Step | Pairs |
 |---|---|
-| 原始句对 | 240,521 |
-| 去掉任一侧为空或超过 10 个 token（标点计入） | −68,258 |
-| 按处理后法语去重，保留原文件中第一条合格译文 | −22,849 |
-| 合格句对 | 149,414 |
-| `random.Random(42).shuffle` 后取前 10,000 | 训练 8,000 / 验证 1,000 / 测试 1,000 |
+| Raw pairs | 240,521 |
+| Drop pairs with an empty side or more than 10 tokens on either side (punctuation counts) | −68,258 |
+| Deduplicate on the processed French, keeping the first qualifying translation | −22,849 |
+| Qualifying pairs | 149,414 |
+| `random.Random(42).shuffle`, take the first 10,000 | train 8,000 / val 1,000 / test 1,000 |
 
-**词表**（只用训练集建立，含 `<PAD> <SOS> <EOS> <UNK>`）：法语 5,778，英语 4,088。验证集、测试集法语 token 中未登录词比例分别为 5.9% 和 5.7%，测试集有 352/1000 句至少含一个未登录词。
+**Vocabularies** are built from the training split only and include `<PAD> <SOS> <EOS> <UNK>`: French 5,778, English 4,088. The French out-of-vocabulary rate is 5.9% of validation tokens and 5.7% of test tokens; 352 of the 1,000 test sentences contain at least one OOV word.
 
-**批次**：`Dataset` 存编号序列，`collate_fn` 在批内补齐并返回法语真实长度。目标序列错位一位：
+**Batching.** The `Dataset` stores id sequences; `collate_fn` pads within each batch and returns the true French lengths. Targets are shifted by one position:
 
 ```
-解码器输入：<SOS> i am happy .
-预测目标：  i am happy . <EOS>
+decoder input: <SOS> i am happy .
+target:        i am happy . <EOS>
 ```
 
-## 2. 模型
+## 2. Model
 
-不带 Attention 的 Encoder–Decoder，共 2,054,392 个参数（`model.py`）：
+Encoder–decoder without attention, 2,054,392 parameters (`model.py`):
 
-- **Encoder**：法语编号 → `nn.Embedding(5778, 128)` → 单层单向 `nn.LSTM(128, 128)`。用 `pack_padded_sequence` 按真实长度打包，最终 `(h, c)` 取自每句最后一个真实词，而不是读完 `<PAD>` 之后的状态（已验证：同一句单独编码与在补齐批次中编码，得到的 h 完全相同）。
-- **状态传递**：编码器最终的 `h` 和 `c` 一起作为解码器 LSTM 的初始状态。
-- **Decoder**：上一个英语 token → `nn.Embedding(4088, 128)`（独立的嵌入层）→ 单层单向 `nn.LSTM(128, 128)` → `nn.Linear(128, 4088)`，输出原始 logits。
+- **Encoder:** French ids → `nn.Embedding(5778, 128)` → one-layer unidirectional `nn.LSTM(128, 128)`. Inputs are packed with `pack_padded_sequence`, so the final `(h, c)` comes from each sentence's last real token rather than from reading `<PAD>`. Checked: encoding a sentence alone and inside a padded batch gives the same `h`.
+- **State transfer:** the encoder's final `h` and `c` together initialise the decoder LSTM.
+- **Decoder:** previous English token → `nn.Embedding(4088, 128)` (separate embedding table) → one-layer unidirectional `nn.LSTM(128, 128)` → `nn.Linear(128, 4088)`, producing raw logits.
 
-## 3. 训练
+## 3. Training
 
-| 超参数 | 值 |
+| Hyperparameter | Value |
 |---|---|
-| 词嵌入 / 隐藏维度 | 128 / 128 |
-| LSTM 层数 | 1 |
+| Embedding / hidden size | 128 / 128 |
+| LSTM layers | 1 |
 | Batch size | 32 |
-| 优化器 / 学习率 | Adam / 0.001 |
-| 梯度裁剪 | 最大范数 1.0 |
-| Teacher Forcing 比例 | 1.0 |
-| 最大轮数 / 提前停止 | 20 / 验证 loss 连续 3 轮不下降 |
-| 随机种子 | 42（`random`、`torch`、DataLoader 打乱均固定） |
+| Optimiser / learning rate | Adam / 0.001 |
+| Gradient clipping | max norm 1.0 |
+| Teacher forcing ratio | 1.0 |
+| Max epochs / early stopping | 20 / 3 epochs without a new best validation loss |
+| Seed | 42 (`random`, `torch` and the DataLoader shuffle) |
 
-- 损失：`CrossEntropyLoss(ignore_index=pad_id)`，输入原始 logits。
-- 每轮 loss 按非 PAD token 数平均：每批 loss 乘以该批非 PAD token 数后累加，再除以总 token 数。
-- **验证 loss 同样使用 Teacher Forcing**（解码器输入真实的上一个词），因此它衡量的是"给定正确前文时预测下一个词"的能力，与独立生成译文不同。
-- 只根据验证 loss 选择最佳 checkpoint；训练脚本中测试集完全不参与。
-- 在 CPU 上训练，每轮约 3 秒。以相同种子重跑一次，逐轮 loss 完全一致。
+- Loss: `CrossEntropyLoss(ignore_index=pad_id)` on raw logits.
+- Epoch loss is averaged over non-PAD tokens: each batch loss is weighted by its non-PAD token count.
+- **Validation loss also uses teacher forcing** (the decoder sees the true previous token), so it measures next-token prediction given a correct prefix, not free generation.
+- The best checkpoint is chosen on validation loss only; the training script never loads the test split.
+- Trained on CPU at about 3 s per epoch. Rerunning with the same seed reproduces every epoch's loss exactly.
 
-![loss 曲线](outputs/loss_curve.png)
+![Loss curves](outputs/loss_curve.png)
 
-| epoch | train loss | val loss |
+| Epoch | Train loss | Val loss |
 |---|---|---|
 | 1 | 4.6747 | 3.9269 |
 | 2 | 3.5785 | 3.5291 |
@@ -70,44 +72,44 @@
 | 8 | 2.0600 | 2.9335 |
 | 9 | 1.8898 | 2.9036 |
 | 10 | 1.7305 | 2.9012 |
-| **11** | **1.5802** | **2.9008（最佳）** |
+| **11** | **1.5802** | **2.9008 (best)** |
 | 12 | 1.4363 | 2.9032 |
 | 13 | 1.3028 | 2.9115 |
-| 14 | 1.1798 | 2.9267（停止） |
+| 14 | 1.1798 | 2.9267 (stopped) |
 
-**最佳 checkpoint：epoch 11**，验证 loss 2.9008。第 9 轮之后验证 loss 基本持平，而训练 loss 继续快速下降，两者差距越拉越大，说明模型开始过拟合 8,000 句训练数据。
+**Best checkpoint: epoch 11**, validation loss 2.9008. From epoch 9 the validation loss is flat while the training loss keeps falling quickly, so the model is starting to overfit the 8,000 training pairs.
 
-## 4. 测试集 BLEU
+## 4. Test BLEU
 
-使用最佳 checkpoint，在完整测试集 1,000 句上用贪心解码独立生成译文（不使用 Teacher Forcing，不输入参考译文），每句最多 15 个 token。预测 token 与参考 token 都用空格连接，参考文本为原始预处理结果，未把未登录词替换成 `<UNK>`。
+The best checkpoint translates all 1,000 test sentences with greedy decoding (no teacher forcing, no access to references), up to 15 tokens each. Predicted and reference tokens are joined with spaces; references are the original preprocessed text, with OOV words left as they are rather than replaced by `<UNK>`.
 
-| 项目 | 值 |
+| Item | Value |
 |---|---|
-| **corpus BLEU** | **11.39** |
-| 详细 | `BLEU = 11.39 45.8/14.7/7.7/3.3 (BP = 1.000 ratio = 1.050 hyp_len = 7036 ref_len = 6700)` |
-| 软件版本 | sacreBLEU 2.6.0 |
-| signature | `nrefs:1\|case:mixed\|eff:no\|tok:none\|smooth:exp\|version:2.6.0` |
+| **Corpus BLEU** | **11.39** |
+| Detail | `BLEU = 11.39 45.8/14.7/7.7/3.3 (BP = 1.000 ratio = 1.050 hyp_len = 7036 ref_len = 6700)` |
+| Software | sacreBLEU 2.6.0 |
+| Signature | `nrefs:1\|case:mixed\|eff:no\|tok:none\|smooth:exp\|version:2.6.0` |
 
-调用方式为 `BLEU(tokenize="none", force=True).corpus_score(predictions, [references])`。`force=True` 只是关闭 sacreBLEU 对"文本看起来已分词"的提示（本作业要求的就是分词后评分），不影响分数。
+Computed as `BLEU(tokenize="none", force=True).corpus_score(predictions, [references])`. `force=True` only silences sacreBLEU's warning that the text looks tokenised (scoring tokenised text is intended here) and does not change the score.
 
-**分组 BLEU**（辅助分析）：
+**BLEU by group:**
 
-| 分组 | 句数 | BLEU |
+| Group | Sentences | BLEU |
 |---|---|---|
-| 法语 1–5 个 token | 176 | 17.45 |
-| 法语 6–7 个 token | 343 | 10.76 |
-| 法语 8 个 token | 172 | 10.77 |
-| 法语 9–10 个 token | 309 | 10.28 |
-| 源句含未登录词 | 352 | 8.73 |
-| 源句无未登录词 | 648 | 12.68 |
+| French 1–5 tokens | 176 | 17.45 |
+| French 6–7 tokens | 343 | 10.76 |
+| French 8 tokens | 172 | 10.77 |
+| French 9–10 tokens | 309 | 10.28 |
+| Source has OOV words | 352 | 8.73 |
+| Source has no OOV words | 648 | 12.68 |
 
-1-gram 精确率 45.8%，说明模型大多能选对相关的英语词；4-gram 精确率只有 3.3%，说明能连续说对的长片段很少。与参考译文完全一致的有 3/1000 句。
+Unigram precision is 45.8%, so the model usually picks relevant English words; 4-gram precision is only 3.3%, so it rarely gets longer stretches right. 3 of the 1,000 outputs match the reference exactly.
 
-## 5. 10 条测试样例
+## 5. Ten test examples
 
-用 `random.Random(42).sample(range(1000), 10)` 抽取（测试集下标 25, 104, 114, 142, 228, 250, 281, 654, 754, 759）：
+Drawn with `random.Random(42).sample(range(1000), 10)` (test indices 25, 104, 114, 142, 228, 250, 281, 654, 754, 759):
 
-| # | 法语输入 | 参考英文 | 模型输出 |
+| # | French | Reference | Output |
 |---|---|---|---|
 | 1 | tu ne sais rien . | you know nothing . | you can ' t be . |
 | 2 | personne ne te demande de manger ça . | no one is asking you to eat that . | no one would you like to do that . |
@@ -120,92 +122,91 @@
 | 9 | et si je dis non ? | what if i say no ? | what i can ' t you ? |
 | 10 | il a décidé de ne pas y aller . | he decided not to go . | he is no longer yet . |
 
-这 10 条比较典型：模型通常能抓住**句子框架**，比如主语（no one / he / i ' m）、否定结构（can ' t）、疑问句和句末标点，但**实义词**常常被换成训练集里的高频搭配（in the room、a few minutes、a little）。其中第 2、3、6、8 条前半句基本正确，后半句跑偏。
+These are typical. The model usually gets the **sentence frame** right — subject (no one / he / i ' m), negation (can ' t), question form and final punctuation — but often swaps the **content words** for frequent training phrases (in the room, a few minutes, a little). Examples 2, 3, 6 and 8 start correctly and drift in the second half.
 
-## 6. 失败案例分析
+## 6. Failure analysis
 
-### 案例 1：重复生成
+### Case 1: Repetition
 
-| 法语 | 参考 | 输出 |
+| French | Reference | Output |
 |---|---|---|
 | c ' est vraiment beau . | it ' s really beautiful . | it ' s really **really** good . |
 | tu as toujours le choix . | you always have a choice . | you ' ve always **always** right . |
 | je viens juste de rentrer du travail . | i just got back from work . | i just **just** wanted to the same . |
 
-测试集中有 17 句出现相邻 token 重复。**原因**：解码器"已经说过什么"的信息只能隐含在 128 维的 `h, c` 里，没有显式记录。生成 `really` 之后，状态变化不大，下一步 `really` 仍然是概率最大的词。贪心解码每步只取最大值、不能回头修改，一旦重复就停不下来。另外，训练时解码器输入的永远是正确的前文，从没见过"自己刚说错"的情况，这正是 Teacher Forcing 带来的曝光偏差。
+17 test outputs repeat a token back to back. The decoder has no explicit record of what it has already said; that information lives only implicitly in the 128-dimensional `h, c`. After emitting `really` the state changes little, so `really` is still the most probable next token, and greedy decoding cannot revise earlier choices. Training with full teacher forcing adds to this: the decoder never saw its own mistakes as input (exposure bias).
 
-### 案例 2：未知词
+### Case 2: Unknown words
 
-| 法语（未登录词加粗） | 参考 | 输出 |
+| French (OOV in bold) | Reference | Output |
 |---|---|---|
 | **corrigez** les mots **soulignés** . | correct the underlined words . | thanks down the rules . |
 | le **tissu** était **teinté** d ' un rouge **éclatant** . | the cloth was dyed bright red . | the meeting was canceled of her dreams . |
 | je ne me **sentais** pas bien . | i didn ' t feel well . | i don ' t know who . |
 
-**原因**：含未登录词的句子 BLEU 只有 8.73，无未登录词的是 12.68。词表只用训练集建立，并且保留了所有训练词（`min_freq=1`），所以**训练时法语输入里从没出现过 `<UNK>`，它的词向量一直停留在随机初始值**。测试时多个关键词都变成同一个未经训练的向量，编码器拿不到任何语义。第 3 例中 `sentais` 只是 `sentir`（感觉）的未完成过去时变位，训练集里可能有它的其他变位，但按词切分时就完全是"新词"。同样的原因也让模型**从不输出 `<UNK>`**：英语训练目标里没有 `<UNK>`，模型从没学过生成它。
+Sentences with OOV words score 8.73 BLEU against 12.68 for the rest. The vocabulary keeps every training word (`min_freq=1`), so **`<UNK>` never appears in the training input and its embedding stays at its random initial value.** At test time several key words collapse onto the same untrained vector and the encoder gets no meaning from them. `sentais` is just an imperfect-tense form of `sentir` (to feel); other forms may be in training, but word-level tokens treat it as brand new. For the same reason the model **never outputs `<UNK>`**: there is no `<UNK>` in the English training targets.
 
-### 案例 3：漏译
+### Case 3: Omission
 
-| 法语 | 参考 | 输出 |
+| French | Reference | Output |
 |---|---|---|
 | sa maison est au pied de la montagne . | her house is at the foot of the mountain . | his house is in the room . |
 | reposons - nous . | let ' s take a rest . | we need . |
 | nous vous aiderons à faire cela . | we ' ll help you do that . | we should do you . |
 
-**原因**：解码器在主语或开头几个词之后就失去了源句信息，用一个常见短语或 `<EOS>` 草草收尾，`au pied de la montagne` 整段没有被翻译。整句法语只被压缩进一个 128 维的 `(h, c)`，解码越往后，这个初始状态的影响越弱，模型越依赖英语自身的语言模型习惯（例如 `is in the room` 在训练集中很常见）。第 2 例同时有未登录词 `reposons`，第 3 例的 `aiderons`（将来时）也是未登录词，与案例 2 叠加。
+After the subject and first few words the decoder loses track of the source and closes with a common phrase or `<EOS>`; `au pied de la montagne` is never translated. The whole French sentence is squeezed into one 128-dimensional `(h, c)`, whose influence fades as decoding goes on, so the model leans on English language-model habits (`is in the room` is frequent in training). Examples 2 and 3 also contain OOV verb forms (`reposons`, future-tense `aiderons`), compounding Case 2.
 
-### 案例 4：较长句子语义完全漂移（不含未登录词）
+### Case 4: Longer sentences drift completely (no OOV)
 
-| 法语 | 参考 | 输出 |
+| French | Reference | Output |
 |---|---|---|
 | la fête s ' est terminée à neuf heures . | the party ended at nine . | food is getting and all of them . |
 | prends un peu de sommeil , d ' accord ? | get some sleep , okay ? | are not going to get my friend . |
 
-**原因**：这两句没有未登录词，仍然完全翻错。法语 9–10 个 token 的句子 BLEU 是 10.28，1–5 个 token 的是 17.45。没有 Attention 时，解码器每一步只能看到同一个固定长度的句子向量，不能回头查看源句的某个具体词。句子越长，信息压缩越严重，`s ' est terminée`（结束了）这样由多个 token 组成的结构就更难保留下来。
+Neither sentence has an OOV word, yet both are wrong. BLEU is 10.28 for 9–10-token sources against 17.45 for 1–5 tokens. Without attention, every decoder step sees only the same fixed-size sentence vector and cannot look back at a specific source word; the longer the sentence, the more is lost in compression, and multi-token constructions such as `s ' est terminée` (ended) are hard to keep.
 
-### 补充：BLEU 低但译文并非全错
+### Low BLEU, but not wrong
 
-| 法语 | 参考 | 输出 | 说明 |
+| French | Reference | Output | Note |
 |---|---|---|---|
-| nous y allons maintenant . | we ' re going now . | we ' re going to go now . | 语义基本正确，多了 `to go` |
-| je dois entrer . | i need to go in . | i have to go . | `have to` 与 `need to` 同义，只漏了 `in` |
-| sa maison est … | **her** house … | **his** house … | 法语 `sa` 的阴阳性跟随宾语 `maison`，不反映主人性别，his 和 her 都可能正确 |
+| nous y allons maintenant . | we ' re going now . | we ' re going to go now . | Meaning preserved; extra `to go` |
+| je dois entrer . | i need to go in . | i have to go . | `have to` ≈ `need to`; only `in` missing |
+| sa maison est … | **her** house … | **his** house … | French `sa` agrees with `maison`, not the owner; both readings are valid |
 
-参考译文只有一个，不是唯一正确的表达。BLEU 只按 n-gram 重合计分，会把同义改写和合理歧义都判为错误。
+There is one reference per sentence and it is not the only correct translation. BLEU counts n-gram overlap only, so paraphrases and genuine ambiguity are scored as errors.
 
-## 7. 问题回答
+## 7. Discussion
 
-**为什么编码器和解码器可以处理长度不同的输入与输出？**
-LSTM 在每个时间步重复使用同一组权重，循环多少步由序列本身决定，所以任意长度的输入都能读完，并得到大小固定的 `(h, c)`。编码器读完整句法语后，把它压缩成这个固定大小的状态。解码器从这个状态出发，每步生成一个英语词，直到生成 `<EOS>`（或达到 15 个 token 上限）才停止，所以输出长度由模型自己决定，与输入长度无关。批量训练时，长度不同的句子通过 `<PAD>` 补齐，再配合真实长度（`pack_padded_sequence`）和损失中的 `ignore_index`，让补齐部分既不影响编码结果，也不影响梯度。
+**Why can the encoder and decoder handle inputs and outputs of different lengths?**
+An LSTM applies the same weights at every time step and runs for as many steps as the sequence has, so it can read any length and still end with a fixed-size `(h, c)`. The encoder compresses the whole French sentence into that state; the decoder starts from it and emits one English token per step until it produces `<EOS>` (or hits the 15-token cap), so output length is decided by the model, independently of input length. In a batch, sentences of different lengths are padded with `<PAD>`; packing with the true lengths and `ignore_index` in the loss keep padding out of both the encoding and the gradients.
 
-**LSTM 的 h 和 c 分别承担什么作用？**
-`c`（记忆状态）是一条贯穿各时间步的"传送带"。每一步只通过遗忘门按比例保留、通过输入门加入新信息，主要是逐元素的加法和乘法，因此梯度沿 `c` 回传时不容易消失，能保存较长期的信息。`h`（隐藏状态）是 `c` 经过 tanh 和输出门筛选后"本步对外展示"的部分：它是当前时间步的输出（解码器中再经过 Linear 得到 logits），同时也作为下一步计算各个门的输入。在本模型中，编码器最终的 `h` 和 `c` 一起交给解码器：`c` 携带整句的长期记忆，`h` 决定解码器第一步的门控和输出。
+**What do the LSTM's h and c do?**
+`c` (cell state) is a conveyor belt through time: each step keeps a fraction of it through the forget gate and adds new information through the input gate, using mainly element-wise additions and multiplications, so gradients flowing back along `c` vanish less and long-range information survives. `h` (hidden state) is the part of `c` exposed at the current step, after tanh and the output gate: it is the step's output (fed to the Linear layer in the decoder) and an input to next step's gates. Here the encoder hands both over: `c` carries the sentence's long-term memory and `h` drives the decoder's first gates and output.
 
-**Teacher Forcing 与实际推理有什么不同？可能造成什么问题？**
-训练时（比例 1.0），解码器每一步的输入是**真实的**上一个英语词。推理时没有参考译文，每一步的输入是**模型自己上一步的预测**。这会造成**曝光偏差**：训练中模型从没见过"前文有错"的情况，推理时一旦某一步预测错，后续输入就偏离了训练分布，错误会逐步累积，表现为后半句跑题、重复生成或漏译（见第 6 节）。同理，用 Teacher Forcing 算出的验证 loss（2.90）只反映"前文正确时预测下一个词"的能力，比实际生成的质量乐观，所以必须另外用无 Teacher Forcing 的生成结果计算 BLEU。
+**How does teacher forcing differ from inference, and what problems can that cause?**
+With a ratio of 1.0, every training decoder step receives the **true** previous English token. At inference there is no reference, so each step receives the **model's own** previous prediction. This creates **exposure bias**: the model never saw a wrong prefix during training, so after one wrong step at inference its inputs leave the training distribution and errors compound — drift in the second half, repetition, omission (Section 6). For the same reason the teacher-forced validation loss (2.90) only measures next-token prediction from a correct prefix and is optimistic about real generation, which is why BLEU is computed on free-running output.
 
-**为什么计算损失时应忽略 PAD？为什么测试集不能参与词表构建？**
-PAD 只是为了让批次成为矩形张量而补的占位符，不是要预测的内容。如果计入损失：(1) 模型会花力气学习"在句末之后预测 `<PAD>`"这种毫无意义的任务，因为它非常容易学，还会拉低 loss，让 loss 看起来比实际好；(2) 每句的权重会随所在批次的补齐长度变化，同一个句子放在不同批次里贡献不同。忽略 PAD 后，loss 是真实 token 上的平均交叉熵。
-测试集用来模拟"模型从没见过的新数据"。如果用测试集建词表，模型就提前知道了测试集里有哪些词，未登录词率被人为压到 0，评估出的效果会比真实部署时更乐观，这属于数据泄漏。这一点在本实验中确实影响很大：测试集有 35% 的句子含未登录词，这类句子的 BLEU 明显更低。
+**Why ignore PAD in the loss, and why must the test set stay out of the vocabulary?**
+PAD is a placeholder that makes the batch rectangular, not something to predict. Counting it would (1) spend capacity on the trivial task of predicting `<PAD>` after the sentence ends and pull the loss down so it looks better than it is, and (2) make a sentence's weight depend on how much padding its batch needs. Ignoring PAD makes the loss the mean cross-entropy over real tokens.
+The test set stands in for unseen data. Building the vocabulary with it would reveal which words appear there, push the OOV rate to zero and give an optimistic estimate — a form of data leakage. It matters a lot here: 35% of test sentences contain OOV words, and they score clearly lower.
 
-**为什么只看训练 loss 或少数成功样例，不能说明翻译质量？**
-训练 loss 衡量的是对**训练集**的拟合程度。本实验从第 11 轮到第 14 轮，训练 loss 从 1.58 降到 1.18，验证 loss 却从 2.90 升到 2.93，训练 loss 越低反而越过拟合。此外，训练 loss 是在 Teacher Forcing 下计算的，不反映自回归生成时的错误累积。少数成功样例则存在挑选偏差：短句、高频句很容易翻对（例如 `où est le beurre ?` → `where ' s the …`），但测试集 1000 句中只有 3 句与参考完全一致。必须在**未参与训练和模型选择**的完整测试集上，用自动指标（BLEU）评估，同时系统地检查随机样例和失败案例，并记住 BLEU 本身也会低估同义表达。
+**Why can't training loss or a few good examples show translation quality?**
+Training loss measures fit to the **training** set. From epoch 11 to 14 it fell from 1.58 to 1.18 while validation loss rose from 2.90 to 2.93 — lower training loss meant more overfitting. It is also computed under teacher forcing, so it ignores error accumulation during generation. A handful of good examples suffers from selection bias: short, frequent sentences are easy (`où est le beurre ?` → `where ' s the …`), yet only 3 of 1,000 test outputs match the reference exactly. Quality has to be measured on the full held-out test set, which played no part in training or model selection, with an automatic metric (BLEU) alongside a systematic look at random samples and failures — remembering that BLEU itself underrates valid paraphrases.
 
-## 8. 局限与可能的改进
+## 8. Limitations and next steps
 
-- **Attention**：让解码器每一步都能回看编码器所有时间步的输出，预计能显著缓解长句和漏译问题。
-- **未知词**：设置 `min_freq=2`，让训练集低频词变成 `<UNK>`，从而训练出 `<UNK>` 的向量；或者改用子词（BPE），把 `sentais` 拆成可以共享的片段。
-- **过拟合**：加 Dropout、权重衰减，或使用更多训练数据（合格句对共 149,414 对，本实验按要求只用了 10,000 对）。
-- **解码**：用 Beam Search 代替贪心解码，可减少重复和局部错误。
-- **曝光偏差**：使用逐步降低 Teacher Forcing 比例的 Scheduled Sampling。
+- **Attention:** let every decoder step look back at all encoder outputs; expected to help most with long sentences and omissions.
+- **Unknown words:** `min_freq=2` so rare training words become `<UNK>` and its embedding gets trained; or subword units (BPE) so `sentais` shares pieces with known forms.
+- **Overfitting:** dropout, weight decay, or more data (149,414 pairs qualify; only 10,000 were used).
+- **Decoding:** beam search instead of greedy decoding to reduce repetition and local errors.
+- **Exposure bias:** scheduled sampling, gradually lowering the teacher forcing ratio.
 
-## 9. 复现
+## 9. Reproduce
 
 ```bash
-cd nmt_lstm
-.venv/bin/python check_lesson1.py   # 数据处理自检，12/12
-.venv/bin/python train.py           # 训练，约 40 秒，输出 outputs/best_model.pt、loss_curve.png、history.json
-.venv/bin/python evaluate.py        # 测试 BLEU、10 条样例、失败案例候选，输出 outputs/test_*.json*
+python -m pytest     # data-processing tests
+python train.py      # ~40 s on CPU → outputs/best_model.pt, loss_curve.png, history.json
+python evaluate.py   # test BLEU, 10 examples, failure-case candidates → outputs/test_*.json*
 ```
 
-环境：Python 3.14、PyTorch 2.14.1（CPU）、sacreBLEU 2.6.0、matplotlib 3.11.2。
+Environment: Python 3.14, PyTorch 2.14.1 (CPU), sacreBLEU 2.6.0, matplotlib 3.11.2.

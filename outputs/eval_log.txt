@@ -1,10 +1,10 @@
-最佳 checkpoint：epoch 11，验证 loss 2.9008
-测试集 corpus BLEU = 11.39
+Best checkpoint: epoch 11, validation loss 2.9008
+Test corpus BLEU = 11.39
   BLEU = 11.39 45.8/14.7/7.7/3.3 (BP = 1.000 ratio = 1.050 hyp_len = 7036 ref_len = 6700)
-  sacreBLEU 2.6.0，signature: nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0
-  与参考完全一致 3/1000；输出含 <UNK> 0 条
+  sacreBLEU 2.6.0, signature: nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0
+  exact matches 3/1000; outputs containing <UNK>: 0
 
-===== 10 条测试样例（random.Random(42).sample）=====
+===== 10 test examples (random.Random(42).sample) =====
 [1] #25
   FR : tu ne sais rien .
   REF: you know nothing .
@@ -46,10 +46,10 @@
   REF: he decided not to go .
   OUT: he is no longer yet .
 
-===== 失败案例候选 =====
+===== Failure-case candidates =====
 
---- 重复生成：共 30 条，前 6 条 ---
-  FR : elles sont dépourvues d ' emplois .  未登录词=['dépourvues']
+--- Repetition: 30 total, first 6 ---
+  FR : elles sont dépourvues d ' emplois .  OOV=['dépourvues']
   REF: they have no jobs .
   OUT: they ' re re .
 
@@ -57,7 +57,7 @@
   REF: i just got back from work .
   OUT: i just just wanted to the same .
 
-  FR : un oiseau géant vola vers lui .  未登录词=['géant', 'vola']
+  FR : un oiseau géant vola vers lui .  OOV=['géant', 'vola']
   REF: a gigantic bird came flying toward him .
   OUT: a lot of people were a lot .
 
@@ -74,42 +74,42 @@
   OUT: they bought a little - - budget wide .
 
 
---- 源句含未登录词：共 270 条，前 6 条 ---
-  FR : le tissu était teinté d ' un rouge éclatant .  未登录词=['tissu', 'teinté', 'éclatant']
+--- Unknown source words: 270 total, first 6 ---
+  FR : le tissu était teinté d ' un rouge éclatant .  OOV=['tissu', 'teinté', 'éclatant']
   REF: the cloth was dyed bright red .
   OUT: the meeting was canceled of her dreams .
 
-  FR : je me méfie toujours de ces gens - là .  未登录词=['méfie']
+  FR : je me méfie toujours de ces gens - là .  OOV=['méfie']
   REF: i ' m always wary of such people .
   OUT: i think i ' ll be there with me .
 
-  FR : elle parlait couramment français .  未登录词=['couramment']
+  FR : elle parlait couramment français .  OOV=['couramment']
   REF: she was fluent in french .
   OUT: she has been dating of his illness .
 
-  FR : corrigez les mots soulignés .  未登录词=['corrigez', 'soulignés']
+  FR : corrigez les mots soulignés .  OOV=['corrigez', 'soulignés']
   REF: correct the underlined words .
   OUT: thanks down the rules .
 
-  FR : j ' apportai un peu de bois à tom .  未登录词=['apportai']
+  FR : j ' apportai un peu de bois à tom .  OOV=['apportai']
   REF: i brought tom some wood .
   OUT: i can ' t get your help with you .
 
-  FR : je ne me sentais pas bien .  未登录词=['sentais']
+  FR : je ne me sentais pas bien .  OOV=['sentais']
   REF: i didn ' t feel well .
   OUT: i don ' t know who .
 
 
---- 漏译（输出比参考短 ≥3 个 token）：共 28 条，前 6 条 ---
-  FR : je craignais de heurter sa sensibilité .  未登录词=['craignais', 'heurter', 'sensibilité']
+--- Omission (output ≥3 tokens shorter than reference): 28 total, first 6 ---
+  FR : je craignais de heurter sa sensibilité .  OOV=['craignais', 'heurter', 'sensibilité']
   REF: i was afraid that i might hurt his feelings .
   OUT: i have to get his proposal .
 
-  FR : je pense que tom l ' a fait exprès .  未登录词=['exprès']
+  FR : je pense que tom l ' a fait exprès .  OOV=['exprès']
   REF: tom did that on purpose , i think .
   OUT: i think tom is frantic .
 
-  FR : reposons - nous .  未登录词=['reposons']
+  FR : reposons - nous .  OOV=['reposons']
   REF: let ' s take a rest .
   OUT: we need .
 
@@ -121,17 +121,17 @@
   REF: that ' s an interesting piece of information .
   OUT: your dog is a problem .
 
-  FR : nous vous aiderons à faire cela .  未登录词=['aiderons']
+  FR : nous vous aiderons à faire cela .  OOV=['aiderons']
   REF: we ' ll help you do that .
   OUT: we should do you .
 
 
---- 长句（法语 10 个 token）且 BLEU < 10：共 78 条，前 6 条 ---
-  FR : le tissu était teinté d ' un rouge éclatant .  未登录词=['tissu', 'teinté', 'éclatant']
+--- Long sentence (10 French tokens) with BLEU < 10: 78 total, first 6 ---
+  FR : le tissu était teinté d ' un rouge éclatant .  OOV=['tissu', 'teinté', 'éclatant']
   REF: the cloth was dyed bright red .
   OUT: the meeting was canceled of her dreams .
 
-  FR : je me méfie toujours de ces gens - là .  未登录词=['méfie']
+  FR : je me méfie toujours de ces gens - là .  OOV=['méfie']
   REF: i ' m always wary of such people .
   OUT: i think i ' ll be there with me .
 
@@ -139,7 +139,7 @@
   REF: the party ended at nine .
   OUT: food is getting and all of them .
 
-  FR : j ' apportai un peu de bois à tom .  未登录词=['apportai']
+  FR : j ' apportai un peu de bois à tom .  OOV=['apportai']
   REF: i brought tom some wood .
   OUT: i can ' t get your help with you .
 
@@ -151,7 +151,7 @@
   REF: get some sleep , okay ?
   OUT: are not going to get my friend .
 
-===== translate() 演示 =====
+===== translate() demo =====
   'Je suis fatigué.' → "i ' m very busy ."
   'Il fait très froid aujourd’hui !' → "it ' s a few minutes !"
   'Où est la gare ?' → "where ' s the door ?"

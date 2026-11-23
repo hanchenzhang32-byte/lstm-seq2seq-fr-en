@@ -1,11 +1,12 @@
-"""第 4 课：训练
+"""Training.
 
-- 损失：CrossEntropyLoss(ignore_index=pad_id)，输入原始 logits
-- 完整 Teacher Forcing（比例 1.0）
-- 每个 epoch 记录训练 / 验证 loss（按非 PAD token 数平均；验证 loss 同样使用 Teacher Forcing）
-- 只按验证 loss 选最佳 checkpoint，并提前停止；测试集在这里完全不出现
+- Loss: CrossEntropyLoss(ignore_index=pad_id) on raw logits
+- Full teacher forcing (ratio 1.0)
+- Train / validation loss logged every epoch, averaged over non-PAD tokens
+  (validation loss also uses teacher forcing)
+- Best checkpoint chosen on validation loss only, with early stopping; the test split is never touched here
 
-运行：.venv/bin/python train.py
+Run: python train.py
 """
 
 import json
@@ -30,7 +31,7 @@ CONFIG = {
     "batch_size": 32,
     "lr": 1e-3,
     "max_epochs": 20,
-    "patience": 3,            # 验证 loss 连续 3 个 epoch 不再下降就停止
+    "patience": 3,            # stop after 3 epochs without a new best validation loss
     "clip_norm": 1.0,
     "teacher_forcing": 1.0,
     "seed": 42,
@@ -44,14 +45,14 @@ def set_seed(seed):
 
 
 def run_epoch(model, loader, criterion, optimizer=None, clip_norm=None):
-    """optimizer 为 None 时只做评估。返回按非 PAD token 平均的 loss。"""
+    """Evaluation only when optimizer is None. Returns the mean loss per non-PAD token."""
     training = optimizer is not None
     model.train(training)
     total_loss, total_tokens = 0.0, 0
     with torch.set_grad_enabled(training):
         for src, src_lens, tgt_in, tgt_out in loader:
             logits = model(src, src_lens, tgt_in)                       # (B, T, V)
-            # CrossEntropyLoss 要求 (N, V) 和 (N,)，把 batch 和时间两维摊平
+            # CrossEntropyLoss expects (N, V) and (N,): flatten batch and time
             loss = criterion(logits.reshape(-1, logits.size(-1)), tgt_out.reshape(-1))
             n_tokens = (tgt_out != criterion.ignore_index).sum().item()
 
@@ -61,7 +62,7 @@ def run_epoch(model, loader, criterion, optimizer=None, clip_norm=None):
                 nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
                 optimizer.step()
 
-            # loss 是该批非 PAD token 的平均值，乘回 token 数再累加，最后整体平均
+            # loss is the batch mean over non-PAD tokens; weight it back by token count
             total_loss += loss.item() * n_tokens
             total_tokens += n_tokens
     return total_loss / total_tokens
@@ -87,7 +88,7 @@ def main():
     set_seed(CONFIG["seed"])
     train, val, _test = split_pairs(load_pairs())
 
-    # 词表只用训练集
+    # vocabularies come from the training split only
     fr_vocab = Vocab([fr for fr, _ in train])
     en_vocab = Vocab([en for _, en in train])
     train_loader = make_loader(train, fr_vocab, en_vocab, CONFIG["batch_size"], shuffle=True, seed=CONFIG["seed"])
@@ -97,7 +98,8 @@ def main():
                     fr_vocab.pad_id, en_vocab.pad_id)
     criterion = nn.CrossEntropyLoss(ignore_index=en_vocab.pad_id)
     optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG["lr"])
-    print(f"法语词表 {len(fr_vocab)}，英语词表 {len(en_vocab)}，参数量 {sum(p.numel() for p in model.parameters()):,}")
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"French vocab {len(fr_vocab)}, English vocab {len(en_vocab)}, parameters {n_params:,}")
 
     history, best_val, best_epoch, bad_epochs = [], float("inf"), 0, 0
     for epoch in range(1, CONFIG["max_epochs"] + 1):
@@ -117,19 +119,19 @@ def main():
                 "epoch": epoch,
                 "val_loss": val_loss,
             }, CKPT_PATH)
-            mark = "  ← 保存最佳"
+            mark = "  <- best, saved"
         else:
             bad_epochs += 1
         print(f"epoch {epoch:2d}  train {train_loss:.4f}  val {val_loss:.4f}  ({time.time() - start:.1f}s){mark}")
         if bad_epochs >= CONFIG["patience"]:
-            print(f"验证 loss 连续 {CONFIG['patience']} 个 epoch 未下降，提前停止")
+            print(f"No improvement in validation loss for {CONFIG['patience']} epochs; stopping early")
             break
 
     with open("outputs/history.json", "w", encoding="utf-8") as f:
         json.dump({"config": CONFIG, "best_epoch": best_epoch, "best_val_loss": best_val,
                    "history": history}, f, indent=2)
     plot_curves(history, best_epoch, "outputs/loss_curve.png")
-    print(f"最佳 epoch {best_epoch}，验证 loss {best_val:.4f}；已保存 {CKPT_PATH}、outputs/loss_curve.png")
+    print(f"Best epoch {best_epoch}, validation loss {best_val:.4f}; saved {CKPT_PATH} and outputs/loss_curve.png")
 
 
 if __name__ == "__main__":
