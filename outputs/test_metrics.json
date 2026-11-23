@@ -1,0 +1,19 @@
+{
+  "bleu": 11.386794623739688,
+  "bleu_full": "BLEU = 11.39 45.8/14.7/7.7/3.3 (BP = 1.000 ratio = 1.050 hyp_len = 7036 ref_len = 6700)",
+  "signature": "nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0",
+  "sacrebleu_version": "2.6.0",
+  "best_epoch": 11,
+  "sample_indices": [
+    25,
+    104,
+    114,
+    142,
+    228,
+    250,
+    281,
+    654,
+    754,
+    759
+  ]
+}

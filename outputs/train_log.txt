@@ -1,0 +1,17 @@
+法语词表 5778，英语词表 4088，参数量 2,054,392
+epoch  1  train 4.6747  val 3.9269  (3.5s)  ← 保存最佳
+epoch  2  train 3.5785  val 3.5291  (3.0s)  ← 保存最佳
+epoch  3  train 3.1878  val 3.3312  (3.0s)  ← 保存最佳
+epoch  4  train 2.8986  val 3.1847  (3.1s)  ← 保存最佳
+epoch  5  train 2.6560  val 3.0929  (3.0s)  ← 保存最佳
+epoch  6  train 2.4417  val 3.0179  (2.9s)  ← 保存最佳
+epoch  7  train 2.2435  val 2.9630  (2.8s)  ← 保存最佳
+epoch  8  train 2.0600  val 2.9335  (2.8s)  ← 保存最佳
+epoch  9  train 1.8898  val 2.9036  (2.9s)  ← 保存最佳
+epoch 10  train 1.7305  val 2.9012  (2.8s)  ← 保存最佳
+epoch 11  train 1.5802  val 2.9008  (2.8s)  ← 保存最佳
+epoch 12  train 1.4363  val 2.9032  (2.9s)
+epoch 13  train 1.3028  val 2.9115  (3.3s)
+epoch 14  train 1.1798  val 2.9267  (3.0s)
+验证 loss 连续 3 个 epoch 未下降，提前停止
+最佳 epoch 11，验证 loss 2.9008；已保存 outputs/best_model.pt、outputs/loss_curve.png

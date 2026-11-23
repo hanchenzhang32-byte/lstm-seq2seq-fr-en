@@ -1,0 +1,157 @@
+最佳 checkpoint：epoch 11，验证 loss 2.9008
+测试集 corpus BLEU = 11.39
+  BLEU = 11.39 45.8/14.7/7.7/3.3 (BP = 1.000 ratio = 1.050 hyp_len = 7036 ref_len = 6700)
+  sacreBLEU 2.6.0，signature: nrefs:1|case:mixed|eff:no|tok:none|smooth:exp|version:2.6.0
+  与参考完全一致 3/1000；输出含 <UNK> 0 条
+
+===== 10 条测试样例（random.Random(42).sample）=====
+[1] #25
+  FR : tu ne sais rien .
+  REF: you know nothing .
+  OUT: you can ' t be .
+[2] #104
+  FR : personne ne te demande de manger ça .
+  REF: no one is asking you to eat that .
+  OUT: no one would you like to do that .
+[3] #114
+  FR : vous ne pouvez pas avoir trente ans !
+  REF: you can ' t be thirty years old .
+  OUT: you can ' t have a little .
+[4] #142
+  FR : ceux - ci sont véritables .
+  REF: these are genuine .
+  OUT: they are singing .
+[5] #228
+  FR : y a - t - il un message ?
+  REF: is there a message ?
+  OUT: is it a few minutes ?
+[6] #250
+  FR : c ' est un charmant jeune homme .
+  REF: he ' s a lovely young man .
+  OUT: it ' s a man in the woods .
+[7] #281
+  FR : j ' aurais aimé avoir meilleure mémoire .
+  REF: i wish i had a better memory .
+  OUT: i can ' t wait for you .
+[8] #654
+  FR : je suis à l ' extérieur .
+  REF: i ' m outside .
+  OUT: i ' m in the room .
+[9] #754
+  FR : et si je dis non ?
+  REF: what if i say no ?
+  OUT: what i can ' t you ?
+[10] #759
+  FR : il a décidé de ne pas y aller .
+  REF: he decided not to go .
+  OUT: he is no longer yet .
+
+===== 失败案例候选 =====
+
+--- 重复生成：共 30 条，前 6 条 ---
+  FR : elles sont dépourvues d ' emplois .  未登录词=['dépourvues']
+  REF: they have no jobs .
+  OUT: they ' re re .
+
+  FR : je viens juste de rentrer du travail .
+  REF: i just got back from work .
+  OUT: i just just wanted to the same .
+
+  FR : un oiseau géant vola vers lui .  未登录词=['géant', 'vola']
+  REF: a gigantic bird came flying toward him .
+  OUT: a lot of people were a lot .
+
+  FR : tu as toujours le choix .
+  REF: you always have a choice .
+  OUT: you ' ve always always right .
+
+  FR : c ' est vraiment beau .
+  REF: it ' s really beautiful .
+  OUT: it ' s really really good .
+
+  FR : elles ont résolu le problème une fois pour toutes .
+  REF: they have solved the problem once and for all .
+  OUT: they bought a little - - budget wide .
+
+
+--- 源句含未登录词：共 270 条，前 6 条 ---
+  FR : le tissu était teinté d ' un rouge éclatant .  未登录词=['tissu', 'teinté', 'éclatant']
+  REF: the cloth was dyed bright red .
+  OUT: the meeting was canceled of her dreams .
+
+  FR : je me méfie toujours de ces gens - là .  未登录词=['méfie']
+  REF: i ' m always wary of such people .
+  OUT: i think i ' ll be there with me .
+
+  FR : elle parlait couramment français .  未登录词=['couramment']
+  REF: she was fluent in french .
+  OUT: she has been dating of his illness .
+
+  FR : corrigez les mots soulignés .  未登录词=['corrigez', 'soulignés']
+  REF: correct the underlined words .
+  OUT: thanks down the rules .
+
+  FR : j ' apportai un peu de bois à tom .  未登录词=['apportai']
+  REF: i brought tom some wood .
+  OUT: i can ' t get your help with you .
+
+  FR : je ne me sentais pas bien .  未登录词=['sentais']
+  REF: i didn ' t feel well .
+  OUT: i don ' t know who .
+
+
+--- 漏译（输出比参考短 ≥3 个 token）：共 28 条，前 6 条 ---
+  FR : je craignais de heurter sa sensibilité .  未登录词=['craignais', 'heurter', 'sensibilité']
+  REF: i was afraid that i might hurt his feelings .
+  OUT: i have to get his proposal .
+
+  FR : je pense que tom l ' a fait exprès .  未登录词=['exprès']
+  REF: tom did that on purpose , i think .
+  OUT: i think tom is frantic .
+
+  FR : reposons - nous .  未登录词=['reposons']
+  REF: let ' s take a rest .
+  OUT: we need .
+
+  FR : sa maison est au pied de la montagne .
+  REF: her house is at the foot of the mountain .
+  OUT: his house is in the room .
+
+  FR : voilà une information intéressante .
+  REF: that ' s an interesting piece of information .
+  OUT: your dog is a problem .
+
+  FR : nous vous aiderons à faire cela .  未登录词=['aiderons']
+  REF: we ' ll help you do that .
+  OUT: we should do you .
+
+
+--- 长句（法语 10 个 token）且 BLEU < 10：共 78 条，前 6 条 ---
+  FR : le tissu était teinté d ' un rouge éclatant .  未登录词=['tissu', 'teinté', 'éclatant']
+  REF: the cloth was dyed bright red .
+  OUT: the meeting was canceled of her dreams .
+
+  FR : je me méfie toujours de ces gens - là .  未登录词=['méfie']
+  REF: i ' m always wary of such people .
+  OUT: i think i ' ll be there with me .
+
+  FR : la fête s ' est terminée à neuf heures .
+  REF: the party ended at nine .
+  OUT: food is getting and all of them .
+
+  FR : j ' apportai un peu de bois à tom .  未登录词=['apportai']
+  REF: i brought tom some wood .
+  OUT: i can ' t get your help with you .
+
+  FR : je suis venue te mettre en garde contre tom .
+  REF: i came here to warn you about tom .
+  OUT: i ' m going to see you in the job .
+
+  FR : prends un peu de sommeil , d ' accord ?
+  REF: get some sleep , okay ?
+  OUT: are not going to get my friend .
+
+===== translate() 演示 =====
+  'Je suis fatigué.' → "i ' m very busy ."
+  'Il fait très froid aujourd’hui !' → "it ' s a few minutes !"
+  'Où est la gare ?' → "where ' s the door ?"

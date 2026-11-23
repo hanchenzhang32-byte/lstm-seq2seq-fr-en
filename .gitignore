@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.DS_Store
+
+# 原始数据不入库，按 README 下载
+data/
